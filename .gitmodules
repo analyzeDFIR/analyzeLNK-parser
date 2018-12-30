@@ -4,3 +4,6 @@
 [submodule "structures"]
 	path = structures
 	url = https://github.com/analyzeDFIR/AnalyzeLNK-structures.git
+[submodule "lib/awps"]
+	path = lib/awps
+	url = https://github.com/analyzeDFIR/analyzeWPS-parser.git
