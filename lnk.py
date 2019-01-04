@@ -115,6 +115,8 @@ class LNK(FileParser):
             string_data.COMMAND_LINE_ARGUMENTS = self.__parse_string_data_string()
         if self.header.DataFlags.HasIconLocation:
             string_data.ICON_LOCATION = self.__parse_string_data_string()
+        if len(string_data) == 0:
+            return None
         return string_data
     def _parse_link_info(self):
         '''
