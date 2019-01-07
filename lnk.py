@@ -23,17 +23,159 @@
 
 import logging
 Logger = logging.getLogger(__name__)
+from os import stat
 from io import SEEK_CUR
 from construct.lib import Container
 
 try:
     from lib.parsers import FileParser, ByteParser
     from lib.parsers.utils import StructureProperty, WindowsTime
+    from lib.awps.wps import WPS
     from structures import lnk as lnkstructs
 except ImportError:
     from .lib.parsers import FileParser, ByteParser
     from .lib.parsers.utils import StructureProperty, WindowsTime
+    from .lib.awps.wps import WPS
     from .structures import lnk as lnkstructs
+
+class LNKExtraDataBlock(ByteParser):
+    '''
+    Class for parsing Windows LNK file extra data section
+    '''
+    header = StructureProperty(0, 'header')
+    body = StructureProperty(1, 'body', deps=['header'])
+    
+    def _parse_known_folder_data(self):
+        '''
+        Args:
+            N/A
+        Returns:
+            Container<String, Any>
+        Preconditions:
+            N/A
+        '''
+        pass
+    def _parse_property_store_data(self):
+        '''
+        Args:
+            N/A
+        Returns:
+            Container<String, Any>
+        Preconditions:
+            N/A
+        '''
+        pass
+    def _parse_shim_data(self):
+        '''
+        Args:
+            N/A
+        Returns:
+            Container<String, Any>
+        Preconditions:
+            N/A
+        '''
+        pass
+    def _parse_icon_environment_data(self):
+        '''
+        Args:
+            N/A
+        Returns:
+            Container<String, Any>
+        Preconditions:
+            N/A
+        '''
+        pass
+    def _parse_darwin_data(self):
+        '''
+        Args:
+            N/A
+        Returns:
+            Container<String, Any>
+        Preconditions:
+            N/A
+        '''
+        pass
+    def _parse_special_folder_data(self):
+        '''
+        Args:
+            N/A
+        Returns:
+            Container<String, Any>
+        Preconditions:
+            N/A
+        '''
+        pass
+    def _parse_console_fe_data(self):
+        '''
+        Args:
+            N/A
+        Returns:
+            Container<String, Any>
+        Preconditions:
+            N/A
+        '''
+        pass
+    def _parse_tracker_data(self):
+        '''
+        Args:
+            N/A
+        Returns:
+            Container<String, Any>
+        Preconditions:
+            N/A
+        '''
+        pass
+    def _parse_console_data(self):
+        '''
+        Args:
+            N/A
+        Returns:
+            Container<String, Any>
+            LNK file console data block (see structures.LNKConsoleDataBlock)
+        Preconditions:
+            N/A
+        '''
+        pass
+    def _parse_environment_variables_data(self):
+        '''
+        Args:
+            N/A
+        Returns:
+            Container<String, Any>
+        Preconditions:
+            N/A
+        '''
+        pass
+    def _parse_body(self):
+        '''
+        Args:
+            N/A
+        Returns:
+            Container<String, Any>
+            Extra data block (see: structures.LNK*DataBlock)
+        Preconditions:
+            N/A
+        '''
+        if self.header.Size < 0x04:
+            return None
+        try:
+            parser = '_parse_%s_data'%self.header.BlockType.lower()
+        except:
+            return None
+        if not (hasattr(self, parser) and callable(getattr(self, parser))):
+            return None
+        return self._clean_value(getattr(self, parser)())
+    def _parse_header(self):
+        '''
+        Args:
+            N/A
+        Returns:
+            Container<String, Any>
+            Extra data block header (see: structures.LNKExtraDataBlockHeader)
+        Preconditions:
+            N/A
+        '''
+        return self._clean_value(lnkstructs.LNKExtraDataBlockHeader.parse_stream(self.stream))
 
 class LNK(FileParser):
     '''
@@ -94,6 +236,27 @@ class LNK(FileParser):
             return lnkstructs.CString(encoding).parse_stream(self.stream)
         except:
             return None
+    def _parse_extra_data(self):
+        '''
+        Args:
+            N/A
+        Returns:
+            List<LNKExtraDataBlock>
+            LNK file extra data block (see: LNKExtraDataBlock)
+        Preconditions:
+            N/A
+        '''
+        extra_data = list()
+        while self.stream.tell() < stat(self.stream.fileno()).st_size:
+            original_position = self.stream.tell()
+            data_block_header = lnkstructs.LNKExtraDataBlockHeader.parse_stream(self.stream)
+            if data_block_header.Size < 0x04:
+                break
+            self.stream.seek(original_position)
+            data_block = LNKExtraDataBlock(self.stream.read(data_block_header.Size))
+            data_block.parse()
+            extra_data.append(data_block)
+        return self._clean_value(extra_data)
     def _parse_string_data(self):
         '''
         Args:
@@ -117,7 +280,7 @@ class LNK(FileParser):
             string_data.ICON_LOCATION = self.__parse_string_data_string()
         if len(string_data) == 0:
             return None
-        return string_data
+        return self._clean_value(string_data)
     def _parse_link_info(self):
         '''
         Args:
@@ -207,7 +370,7 @@ class LNK(FileParser):
                     ), encoding=encoding)
         finally:
             self.stream.seek(original_position + link_info.header.Size)
-        return link_info
+        return self._clean_value(link_info)
     def _parse_linktarget_idlist(self):
         '''
         Args:
