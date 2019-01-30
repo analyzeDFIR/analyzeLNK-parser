@@ -26,16 +26,17 @@ Logger = logging.getLogger(__name__)
 from os import stat
 from io import SEEK_CUR
 from construct.lib import Container
+from construct import Int64ul
 
 try:
     from lib.parsers import FileParser, ByteParser
     from lib.parsers.utils import StructureProperty, WindowsTime
-    from lib.awps.wps import WPS
+    from lib.awps.wps import WPSPropertyStorage
     from structures import lnk as lnkstructs
 except ImportError:
     from .lib.parsers import FileParser, ByteParser
     from .lib.parsers.utils import StructureProperty, WindowsTime
-    from .lib.awps.wps import WPS
+    from .lib.awps.wps import WPSPropertyStorage
     from .structures import lnk as lnkstructs
 
 class LNKExtraDataBlock(ByteParser):
@@ -64,7 +65,7 @@ class LNKExtraDataBlock(ByteParser):
         Preconditions:
             N/A
         '''
-        pass
+        print(self.source)
     def _parse_shim_data(self):
         '''
         Args:
@@ -164,7 +165,7 @@ class LNKExtraDataBlock(ByteParser):
             return None
         if not (hasattr(self, parser) and callable(getattr(self, parser))):
             return None
-        return self._clean_value(getattr(self, parser)())
+        return getattr(self, parser)()
     def _parse_header(self):
         '''
         Args:
@@ -175,7 +176,7 @@ class LNKExtraDataBlock(ByteParser):
         Preconditions:
             N/A
         '''
-        return self._clean_value(lnkstructs.LNKExtraDataBlockHeader.parse_stream(self.stream))
+        return lnkstructs.LNKExtraDataBlockHeader.parse_stream(self.stream)
 
 class LNK(FileParser):
     '''
@@ -247,7 +248,8 @@ class LNK(FileParser):
             N/A
         '''
         extra_data = list()
-        while self.stream.tell() < stat(self.stream.fileno()).st_size:
+        file_size = stat(self.stream.fileno()).st_size
+        while self.stream.tell() < file_size:
             original_position = self.stream.tell()
             data_block_header = lnkstructs.LNKExtraDataBlockHeader.parse_stream(self.stream)
             if data_block_header.Size < 0x04:
@@ -256,7 +258,7 @@ class LNK(FileParser):
             data_block = LNKExtraDataBlock(self.stream.read(data_block_header.Size))
             data_block.parse()
             extra_data.append(data_block)
-        return self._clean_value(extra_data)
+        return extra_data
     def _parse_string_data(self):
         '''
         Args:
@@ -280,7 +282,7 @@ class LNK(FileParser):
             string_data.ICON_LOCATION = self.__parse_string_data_string()
         if len(string_data) == 0:
             return None
-        return self._clean_value(string_data)
+        return string_data
     def _parse_link_info(self):
         '''
         Args:
@@ -370,7 +372,7 @@ class LNK(FileParser):
                     ), encoding=encoding)
         finally:
             self.stream.seek(original_position + link_info.header.Size)
-        return self._clean_value(link_info)
+        return link_info
     def _parse_linktarget_idlist(self):
         '''
         Args:
@@ -394,7 +396,7 @@ class LNK(FileParser):
                     idlist.idlist.append(
                         lnkstructs.LNKLinkTargetIDListItemID.parse_stream(self.stream)
                     )
-            return self._clean_value(idlist)
+            return idlist
         finally:
             self.stream.seek(original_position + idlist.Size)
     def _parse_header(self):
@@ -408,15 +410,15 @@ class LNK(FileParser):
             N/A
         '''
         header = lnkstructs.LNKFileHeader.parse_stream(self.stream)
-        if not (
-            header.LNKClassIdentifier.Group1 == 0x00021401 and \
-            header.LNKClassIdentifier.Group2 == 0x0000 and \
-            header.LNKClassIdentifier.Group3 == 0x0000 and \
-            header.LNKClassIdentifier.Group4 == 0x00C0 and \
-            header.LNKClassIdentifier.Group5 == 0x000000000046
-        ):
-            Logger.warning('found incorrect link class identifier')
+        #if not (
+        #    header.LNKClassIdentifier.Group1 == 0x00021401 and \
+        #    header.LNKClassIdentifier.Group2 == 0x0000 and \
+        #    header.LNKClassIdentifier.Group3 == 0x0000 and \
+        #    header.LNKClassIdentifier.Group4 == 0x00C0 and \
+        #    header.LNKClassIdentifier.Group5 == 0x000000000046
+        #):
+        #    Logger.warning('found incorrect link class identifier')
         header.CreateTime = WindowsTime.parse_filetime(header.RawCreateTime)
         header.LastAccessTime = WindowsTime.parse_filetime(header.RawLastAccessTime)
         header.LastModifiedTime = WindowsTime.parse_filetime(header.RawLastModifiedTime)
-        return self._clean_value(header)
+        return header
