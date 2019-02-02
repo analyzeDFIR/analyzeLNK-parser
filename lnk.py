@@ -31,12 +31,12 @@ from construct import Int64ul
 try:
     from lib.parsers import FileParser, ByteParser
     from lib.parsers.utils import StructureProperty, WindowsTime
-    from lib.awps.wps import WPSPropertyStorage
+    from lib.awps import WPSPropertyStorage
     from structures import lnk as lnkstructs
 except ImportError:
     from .lib.parsers import FileParser, ByteParser
     from .lib.parsers.utils import StructureProperty, WindowsTime
-    from .lib.awps.wps import WPSPropertyStorage
+    from .lib.awps import WPSPropertyStorage
     from .structures import lnk as lnkstructs
 
 class LNKExtraDataBlock(ByteParser):
@@ -61,11 +61,11 @@ class LNKExtraDataBlock(ByteParser):
         Args:
             N/A
         Returns:
-            Container<String, Any>
+            WPSPropertyStorage
         Preconditions:
             N/A
         '''
-        print(self.source)
+        return WPSPropertyStorage(self.source[self.stream.tell():]).parse()
     def _parse_shim_data(self):
         '''
         Args:
@@ -410,14 +410,6 @@ class LNK(FileParser):
             N/A
         '''
         header = lnkstructs.LNKFileHeader.parse_stream(self.stream)
-        #if not (
-        #    header.LNKClassIdentifier.Group1 == 0x00021401 and \
-        #    header.LNKClassIdentifier.Group2 == 0x0000 and \
-        #    header.LNKClassIdentifier.Group3 == 0x0000 and \
-        #    header.LNKClassIdentifier.Group4 == 0x00C0 and \
-        #    header.LNKClassIdentifier.Group5 == 0x000000000046
-        #):
-        #    Logger.warning('found incorrect link class identifier')
         header.CreateTime = WindowsTime.parse_filetime(header.RawCreateTime)
         header.LastAccessTime = WindowsTime.parse_filetime(header.RawLastAccessTime)
         header.LastModifiedTime = WindowsTime.parse_filetime(header.RawLastModifiedTime)
