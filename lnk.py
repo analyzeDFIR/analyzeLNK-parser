@@ -46,6 +46,22 @@ class LNKExtraDataBlock(ByteParser):
     header = StructureProperty(0, 'header')
     body = StructureProperty(1, 'body', deps=['header'])
     
+    def __init__(self, *args, codepage='UTF8', **kwargs):
+        super().__init__(*args, **kwargs)
+        self.codepage = codepage
+    @property
+    def codepage(self):
+        '''
+        Getter for codepage
+        '''
+        return self.__codepage
+    @codepage.setter
+    def codepage(self, value):
+        '''
+        Setter for codepage
+        '''
+        assert isinstance(value, str)
+        self.__codepage = value
     def _parse_known_folder_data(self):
         '''
         Args:
@@ -82,50 +98,73 @@ class LNKExtraDataBlock(ByteParser):
             N/A
         Returns:
             Container<String, Any>
+            LNK file icon environment data block
+            (see structures.LNKIconEnvironmentDataBlock)
         Preconditions:
             N/A
         '''
-        pass
+        icon_environment_data = lnkstructs.LNKIconEnvironmentDataBlock.parse_stream(self.stream)
+        icon_environment_data.TargetLocation = lnkstructs.CString(self.codepage).parse(
+            icon_environment_data.RawTargetLocation
+        )
+        icon_environment_data.UTargetLocation = lnkstructs.LNKUnicodeCString.parse(
+            icon_environment_data.RawUTargetLocation
+        )
+        return icon_environment_data
     def _parse_darwin_data(self):
         '''
         Args:
             N/A
         Returns:
             Container<String, Any>
+            LNK file darwin data block (see structures.LNKDarwinDataBlock)
         Preconditions:
             N/A
         '''
-        pass
+        darwin_data = lnkstructs.LNKDarwinDataBlock.parse_stream(self.stream)
+        # NOTE: darwin_data.ApplicationIdentifier is ignored due to MS documentation
+        darwin_data.UApplicationIdentifier = lnkstructs.LNKUnicodeCString.parse(
+            darwin_data.RawUApplicationIdentifier
+        )
+        return darwin_data
     def _parse_special_folder_data(self):
         '''
         Args:
             N/A
         Returns:
             Container<String, Any>
+            LNK file special folder data block
+            (see lnkstructs.LNKSpecialFolderDataBlock)
         Preconditions:
             N/A
         '''
-        pass
+        return lnkstructs.LNKSpecialFolderDataBlock.parse_stream(self.stream)
     def _parse_console_fe_data(self):
         '''
         Args:
             N/A
         Returns:
             Container<String, Any>
+            LNK file console FE data block
+            (see structures.LNKConsoleFEDataBlock)
         Preconditions:
             N/A
         '''
-        pass
+        return lnkstructs.LNKConsoleFEDataBlock.parse_stream(self.stream)
     def _parse_tracker_data(self):
         '''
         Args:
             N/A
         Returns:
             Container<String, Any>
+            LNK file tracker data block
+            (see structures.LNKTrackerDataBlock)
         Preconditions:
             N/A
         '''
-        pass
+        tracker_data = lnkstructs.LNKTrackerDataBlock.parse_stream(self.stream)
+        tracker_data.MachineID = lnkstructs.CString(self.codepage).parse(tracker_data.RawMachineID)
+        return tracker_data
     def _parse_console_data(self):
         '''
         Args:
@@ -136,17 +175,25 @@ class LNKExtraDataBlock(ByteParser):
         Preconditions:
             N/A
         '''
-        pass
+        console_data = lnkstructs.LNKConsoleDataBlock.parse_stream(self.stream)
+        console_data.HistoryDuplicatesAllowed = True \
+            if console_data.RawHistoryDuplicatesAllowed == 0x00 else False
+        return console_data
     def _parse_environment_variables_data(self):
         '''
         Args:
             N/A
         Returns:
             Container<String, Any>
+            LNK file environment variables data block 
+            (see structures.LNKEnvironmentVariablesDataBlock)
         Preconditions:
             N/A
         '''
-        pass
+        envars = lnkstructs.LNKEnvironmentVariablesDataBlock.parse_stream(self.stream)
+        envars.TargetLocation = lnkstructs.CString(self.codepage).parse(envars.RawTargetLocation)
+        envars.UTargetLocation = lnkstructs.LNKUnicodeCString.parse(envars.RawUTargetLocation)
+        return envars
     def _parse_body(self):
         '''
         Args:
@@ -255,8 +302,10 @@ class LNK(FileParser):
             if data_block_header.Size < 0x04:
                 break
             self.stream.seek(original_position)
-            data_block = LNKExtraDataBlock(self.stream.read(data_block_header.Size))
-            data_block.parse()
+            data_block = LNKExtraDataBlock(
+                self.stream.read(data_block_header.Size),
+                codepage=self.codepage
+            ).parse()
             extra_data.append(data_block)
         return extra_data
     def _parse_string_data(self):
