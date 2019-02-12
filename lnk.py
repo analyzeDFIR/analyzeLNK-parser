@@ -71,7 +71,7 @@ class LNKExtraDataBlock(ByteParser):
         Preconditions:
             N/A
         '''
-        pass
+        return lnkstructs.LNKKnownFolderDataBlock.parse_stream(self.stream)
     def _parse_property_store_data(self):
         '''
         Args:
@@ -91,7 +91,7 @@ class LNKExtraDataBlock(ByteParser):
         Preconditions:
             N/A
         '''
-        pass
+        return lnkstructs.LNKShimDataBlock.parse_stream(self.stream)
     def _parse_icon_environment_data(self):
         '''
         Args:
